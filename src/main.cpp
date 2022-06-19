@@ -13,11 +13,10 @@
 #define BUZZER 2 // D4
 bool sensorStatus[5] = {false,false,false,false,false};
 
-
 // DHT22
 #define DHT22_INDEX 0
-#define DHTPIN 14     // what digital pin the DHT22 is conected to
-#define DHTTYPE DHT22   // there are multiple kinds of DHT sensors
+#define DHTPIN 14     // D5
+#define DHTTYPE DHT22
 
 // WIFI Spot
 const char* ssid = "SSID";
@@ -73,13 +72,13 @@ void sendDataToServer() {
       http.begin(client, serverName);
       http.addHeader("Content-Type", "application/x-www-form-urlencoded");
       String httpRequestData = "api_key="+apiKey;
-      httpRequestData+="&field1="+String(dhtTemperature);
-      httpRequestData+="&field2="+String(dhtHeatIndex);
-      httpRequestData+="&field3="+String(dhtHumidity);
-      httpRequestData+="&field4="+String(bmpPressure);
-      httpRequestData+="&field5="+String(bmpTemperature);
-      httpRequestData+="&field6="+String(lux);
-      httpRequestData+="&field7="+String(isRaining);
+      if(sensorStatus[0]) httpRequestData+="&field1="+String(dhtTemperature);
+      if(sensorStatus[0]) httpRequestData+="&field2="+String(dhtHeatIndex);
+      if(sensorStatus[0]) httpRequestData+="&field3="+String(dhtHumidity);
+      if(sensorStatus[1]) httpRequestData+="&field4="+String(bmpPressure);
+      if(sensorStatus[1]) httpRequestData+="&field5="+String(bmpTemperature);
+      if(sensorStatus[2]) httpRequestData+="&field6="+String(lux);
+      if(sensorStatus[3]) httpRequestData+="&field7="+String(isRaining);
       int httpResponseCode = http.POST(httpRequestData);
       Serial.print("HTTP Response code: ");
       Serial.println(httpResponseCode);
@@ -217,12 +216,16 @@ void setup() {
   Serial.println("-------------------------------------");
   sensorStatus[3] = true;   
   Serial.println("YL-38 Running!!");
-  Serial.println("-------------------------------------");  
+  Serial.println("-------------------------------------");
+  sensorStatus[0] = true;
+  sensorStatus[1] = false;
+  sensorStatus[2] = false;
+  sensorStatus[3] = false;
 
 }
 
 void loop() {
-  if(timeSinceLastRead > 30000) {
+  if(timeSinceLastRead > 60000) {
     digitalWrite(ACTIVITY_LED,HIGH);
     if(sensorStatus[DHT22_INDEX]) {
       tone(BUZZER,440);
