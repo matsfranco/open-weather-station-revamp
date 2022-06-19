@@ -7,33 +7,29 @@
 #include <Wire.h>
 #include <SFE_BMP180.h>
 #include <BH1750.h>
-
-// DHT22
-#define DHTPIN 14     // what digital pin the DHT22 is conected to
-#define DHTTYPE DHT22   // there are multiple kinds of DHT sensors
-
 #define I2C_SCL 12
 #define I2C_SDA 13
-float dst,bt,bp,ba;
-char dstmp[20],btmp[20],bprs[20],balt[20];
-bool bmp085_present=true;
-
-
+#define ACTIVITY_LED 15 // D8
 bool sensorStatus[5] = {false,false,false,false,false};
+
+// DHT22
 #define DHT22_INDEX 0
-#define BMP180_INDEX 1
-#define BH1750_INDEX 2
+#define DHTPIN 14     // what digital pin the DHT22 is conected to
+#define DHTTYPE DHT22   // there are multiple kinds of DHT sensors
 
 // WIFI Spot
 const char* ssid = "SSID";
 const char* password = "PSWD";
 unsigned long timerDelay = 10000;
+#define CONN_STATUS_LED 13 // D7
 
 // BMP180
+#define BMP180_INDEX 1
 SFE_BMP180 bmpSensor;
 double bmpTemperature, bmpPressure;
 
 //BH1750
+#define BH1750_INDEX 2
 BH1750 lightMeter;
 float lux;
 
@@ -52,18 +48,20 @@ float dhtHeatIndex;
 int timeSinceLastRead = 0;
 
 void connectToRouter() {
+  digitalWrite(CONN_STATUS_LED,LOW);
   WiFi.begin(ssid, password);
   Serial.println("Connecting");
+  bool status = false;
   while(WiFi.status() != WL_CONNECTED) {
     delay(100);
     Serial.print(".");
+    status = !status;
+    digitalWrite(CONN_STATUS_LED,status);
   }
+  digitalWrite(CONN_STATUS_LED,HIGH);
   Serial.println("");
   Serial.print("Connected to WiFi network with IP Address: ");
   Serial.println(WiFi.localIP());
-  Serial.println("Timer set to 10 seconds (timerDelay variable), it will take 10 seconds before publishing the first reading.");
-  // Random seed is a number used to initialize a pseudorandom number generator
-  randomSeed(analogRead(0));
 }
 
 void sendDataToServer() {
@@ -169,6 +167,9 @@ void printSensorData(float temperature, float humidity, float heatIndex) {
 
 void setup() {
   Serial.begin(9600);
+  pinMode(ACTIVITY_LED,OUTPUT);
+  digitalWrite(ACTIVITY_LED,LOW);
+  pinMode(CONN_STATUS_LED,OUTPUT);
   connectToRouter();
   Serial.setTimeout(2000);
   // Wait for serial to initialize.
@@ -209,6 +210,7 @@ void setup() {
 
 void loop() {
   if(timeSinceLastRead > 30000) {
+    digitalWrite(ACTIVITY_LED,HIGH);
     if(sensorStatus[DHT22_INDEX]) {
       Serial.println(">> DHT22 Data");
       dht_getData();
@@ -222,10 +224,9 @@ void loop() {
       Serial.println(">> BH1750 Data");
       bh_getData();
     }
-
     sendDataToServer();
-
     timeSinceLastRead = 0;
+    digitalWrite(ACTIVITY_LED,LOW);
   }
   delay(100);
   timeSinceLastRead += 100;
