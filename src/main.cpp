@@ -22,6 +22,8 @@ bool sensorStatus[5] = {false,false,false,false,false};
 // WIFI Spot
 const char* ssid = "SSID";
 const char* password = "PSWD";
+String apiKey = "API_KEY";
+const char* serverName = "http://api.thingspeak.com/update";
 unsigned long timerDelay = 10000;
 #define CONN_STATUS_LED 13 // D7
 
@@ -30,16 +32,15 @@ unsigned long timerDelay = 10000;
 SFE_BMP180 bmpSensor;
 double bmpTemperature, bmpPressure;
 
-//BH1750
+// BH1750
 #define BH1750_INDEX 2
 BH1750 lightMeter;
 float lux;
 
-// Thingspeak
-// Domain Name with full URL Path for HTTP POST Request
-const char* serverName = "http://api.thingspeak.com/update";
-// Service API Key
-String apiKey = "API_KEY";
+// LM393 + YL-38
+#define YL38_INDEX 3
+#define YL38_PIN 12 // D6
+bool isRaining = false;
 
 DHT dht(DHTPIN, DHTTYPE);
 float dhtTemperature;
@@ -78,6 +79,7 @@ void sendDataToServer() {
       httpRequestData+="&field4="+String(bmpPressure);
       httpRequestData+="&field5="+String(bmpTemperature);
       httpRequestData+="&field6="+String(lux);
+      httpRequestData+="&field7="+String(isRaining);
       int httpResponseCode = http.POST(httpRequestData);
       Serial.print("HTTP Response code: ");
       Serial.println(httpResponseCode);
@@ -143,6 +145,16 @@ void bh_getData() {
   }
 }
 
+void yl_getData() {
+  if(digitalRead(YL38_PIN)) {
+    isRaining = 0;
+  } else {
+    isRaining = 1;
+  }
+  Serial.print("isRaining: ");
+  Serial.println(isRaining);
+}
+
 void printSensorData(float temperature, float humidity, float heatIndex) {
   Serial.print("Humidity: ");
   Serial.print(humidity);
@@ -162,6 +174,7 @@ void setup() {
   pinMode(CONN_STATUS_LED,OUTPUT);
   pinMode(BUZZER,OUTPUT);
   digitalWrite(BUZZER,LOW);
+  pinMode(YL38_PIN,INPUT);
 
   connectToRouter();
   Serial.setTimeout(2000);
@@ -192,17 +205,24 @@ void setup() {
   Serial.println("-------------------------------------");
   if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE)) {
     sensorStatus[2] = true;
-    Serial.println("BH1750 Running in mode CONTINUOUS_HIGH_RES_MODE");
+    Serial.println("BH1750 Running!! CONTINUOUS_HIGH_RES_MODE");
     Serial.println("-------------------------------------");  
   } else {
     sensorStatus[2] = false;
     Serial.println(F("BH1750 INIT FAIL"));
     Serial.println("-------------------------------------"); 
   }
+
+  Serial.println("YL-38 Started");
+  Serial.println("-------------------------------------");
+  sensorStatus[3] = true;   
+  Serial.println("YL-38 Running!!");
+  Serial.println("-------------------------------------");  
+
 }
 
 void loop() {
-  if(timeSinceLastRead > 10000) {
+  if(timeSinceLastRead > 30000) {
     digitalWrite(ACTIVITY_LED,HIGH);
     if(sensorStatus[DHT22_INDEX]) {
       tone(BUZZER,440);
@@ -223,6 +243,13 @@ void loop() {
       bh_getData();
       noTone(BUZZER);
     }
+    if(sensorStatus[YL38_INDEX]) {
+      tone(BUZZER,440);
+      Serial.println(">> YL-38 Data");
+      yl_getData();
+      noTone(BUZZER);
+    }
+
     tone(BUZZER,440);
     sendDataToServer();
     timeSinceLastRead = 0;
