@@ -10,7 +10,9 @@
 #define I2C_SCL 12
 #define I2C_SDA 13
 #define ACTIVITY_LED 15 // D8
+#define BUZZER 2 // D4
 bool sensorStatus[5] = {false,false,false,false,false};
+
 
 // DHT22
 #define DHT22_INDEX 0
@@ -38,7 +40,6 @@ float lux;
 const char* serverName = "http://api.thingspeak.com/update";
 // Service API Key
 String apiKey = "API_KEY";
-
 
 DHT dht(DHTPIN, DHTTYPE);
 float dhtTemperature;
@@ -68,13 +69,8 @@ void sendDataToServer() {
   if(WiFi.status()== WL_CONNECTED){
       WiFiClient client;
       HTTPClient http;
-      
-      // Your Domain name with URL path or IP address with path
       http.begin(client, serverName);
-      
-      // Specify content-type header
       http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-      // Data to send with HTTP POST
       String httpRequestData = "api_key="+apiKey;
       httpRequestData+="&field1="+String(dhtTemperature);
       httpRequestData+="&field2="+String(dhtHeatIndex);
@@ -82,14 +78,9 @@ void sendDataToServer() {
       httpRequestData+="&field4="+String(bmpPressure);
       httpRequestData+="&field5="+String(bmpTemperature);
       httpRequestData+="&field6="+String(lux);
-
-      // Send HTTP POST request
       int httpResponseCode = http.POST(httpRequestData);
-           
       Serial.print("HTTP Response code: ");
       Serial.println(httpResponseCode);
-        
-      // Free resources
       http.end();
     }
     else {
@@ -152,7 +143,6 @@ void bh_getData() {
   }
 }
 
-
 void printSensorData(float temperature, float humidity, float heatIndex) {
   Serial.print("Humidity: ");
   Serial.print(humidity);
@@ -170,9 +160,12 @@ void setup() {
   pinMode(ACTIVITY_LED,OUTPUT);
   digitalWrite(ACTIVITY_LED,LOW);
   pinMode(CONN_STATUS_LED,OUTPUT);
+  pinMode(BUZZER,OUTPUT);
+  digitalWrite(BUZZER,LOW);
+
   connectToRouter();
   Serial.setTimeout(2000);
-  // Wait for serial to initialize.
+
   while(!Serial) { }
   Wire.begin(D2, D1);
   dht.begin();
@@ -209,24 +202,32 @@ void setup() {
 }
 
 void loop() {
-  if(timeSinceLastRead > 30000) {
+  if(timeSinceLastRead > 10000) {
     digitalWrite(ACTIVITY_LED,HIGH);
     if(sensorStatus[DHT22_INDEX]) {
+      tone(BUZZER,440);
       Serial.println(">> DHT22 Data");
       dht_getData();
       printSensorData(dhtTemperature,dhtHumidity,dhtHeatIndex);
+      noTone(BUZZER);
     } 
     if(sensorStatus[BMP180_INDEX]) {
+      tone(BUZZER,440);
       Serial.println(">> BMP180 Data");
       bmp_getData();
+      noTone(BUZZER);
     }
     if(sensorStatus[BH1750_INDEX]) {
+      tone(BUZZER,440);
       Serial.println(">> BH1750 Data");
       bh_getData();
+      noTone(BUZZER);
     }
+    tone(BUZZER,440);
     sendDataToServer();
     timeSinceLastRead = 0;
     digitalWrite(ACTIVITY_LED,LOW);
+    noTone(BUZZER);
   }
   delay(100);
   timeSinceLastRead += 100;
